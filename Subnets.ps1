@@ -41,5 +41,5 @@ $nsg = New-AzureRmNetworkSecurityGroup -ResourceGroupName $ResourceGroupName -Lo
 Add-AzureRmVirtualNetworkSubnetConfig -Name "private-subnet" -AddressPrefix "10.0.0.0/24" -VirtualNetwork $vnet -NetworkSecurityGroup $nsg
 
 #Public Subnet
-Add-AzureRmVirtualNetworkSubnetConfig -Name "private-subnet" -AddressPrefix "10.0.1.0/24" -VirtualNetwork $vnet 
+Add-AzureRmVirtualNetworkSubnetConfig -Name "public-subnet" -AddressPrefix "10.0.1.0/24" -VirtualNetwork $vnet 
 $vnet | Set-AzureRmVirtualNetwork

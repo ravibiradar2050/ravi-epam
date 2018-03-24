@@ -11,8 +11,8 @@
     [string] $PublicSubnetName = "public-subnet",
     [int] $NumberOfVmsInPrivate = 2,
     [int] $NumberOfVmsInPublic = 2,
-    [string] $PrivateSubnetLB = "PrivateVMsPublicIP",
-    [string] $PublicSubnetLB = "PublicIp"
+    [string] $PrivateSubnetLB = "PublicLoadBalancer",
+    [string] $PublicSubnetLB = "PrivateVMLoadBalancer"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,8 +36,8 @@ catch [System.Exception]
 $cred = New-Object System.Management.Automation.PSCredential ("Ravi", (ConvertTo-SecureString -String "P@ssword@123" -AsPlainText -Force))
 
 $vnet = Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroupName -Name $VirtualNetworkName
-$PrivateAvailset = New-AzureRmAvailabilitySet -ResourceGroupName $ResourceGroupName -Name "PrivateAvailset" -Location $Location 
-$PublicAvailset = New-AzureRmAvailabilitySet -ResourceGroupName $ResourceGroupName -Name "PublicAvailset" -Location $Location 
+$PrivateAvailset = New-AzureRmAvailabilitySet -ResourceGroupName $ResourceGroupName -Name "PrivateAvailset" -Location $Location -Sku 'Aligned' -PlatformUpdateDomainCount 3 -PlatformFaultDomainCount 3
+$PublicAvailset = New-AzureRmAvailabilitySet -ResourceGroupName $ResourceGroupName -Name "PublicAvailset" -Location $Location -Sku 'Aligned' -PlatformUpdateDomainCount 3 -PlatformFaultDomainCount 3
 
 $PrivateVMloadBalancer = Get-AzureRmLoadBalancer -Name $PrivateSubnetLB -ResourceGroupName $ResourceGroupName
 $PublicVMloadBalancer = Get-AzureRmLoadBalancer -Name $PublicSubnetLB -ResourceGroupName $ResourceGroupName

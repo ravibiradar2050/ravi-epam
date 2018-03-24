@@ -25,6 +25,7 @@ catch [System.Exception]
     $login = Set-AzureRmContext -SubscriptionId $SubscriptionId 
 }
 
+New-AzureRmPublicIpAddress -Name $PublicAddressName -ResourceGroupName $ResourceGroupName -AllocationMethod Dynamic -Location $Location -Force
 
 $publicIp = Get-AzureRmPublicIpAddress -ResourceGroupName $ResourceGroupName -Name $PublicAddressName 
 
@@ -44,6 +45,7 @@ $lb = New-AzureRmLoadBalancer -ResourceGroupName $ResourceGroupName -Name 'Publi
   -FrontendIpConfiguration $feip -BackendAddressPool $bepool `
   -Probe $probe -LoadBalancingRule $rule -InboundNatRule $natrule
 
+New-AzureRmPublicIpAddress -Name $PrivateSubnetVmsPublicIp -ResourceGroupName $ResourceGroupName -AllocationMethod Dynamic -Location $Location -Force
 $publicIp = Get-AzureRmPublicIpAddress -ResourceGroupName $ResourceGroupName -Name $PrivateSubnetVmsPublicIp 
 
 $feip = New-AzureRmLoadBalancerFrontendIpConfig -Name 'FrontEndPool' -PublicIpAddress $publicIp
