@@ -1,0 +1,370 @@
+﻿{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "string"
+    },
+    "adminPassword": {
+      "type": "securestring"
+    },
+    "AdminUsername": {
+      "type": "string"
+    },
+    "diagStorageAccountName": {
+      "type": "string"
+    },
+    "diagStorageAccountType": {
+      "type": "string"
+    },
+    "PrivateVMName": {
+      "type": "string"
+    },
+    "PublicVMName": {
+      "type": "string"
+    },
+    "PrivateSubnetName": {
+      "type": "string",
+      "defaultValue": "Private-Subnet"
+    },
+    "PublicSubnetName": {
+      "type": "string",
+      "defaultValue": "Public-Subnet"
+    },
+    "VirtualNetworkName": {
+      "type": "string"
+    },
+    "PrivateNicName": {
+      "type": "string",
+      "defaultValue": "privateNic"
+    },
+    "PublicNicName": {
+      "type": "string",
+      "defaultValue": "PublicNic"
+    },
+    "NumberOfPrivateVM": {
+      "type": "int",
+      "defaultValue": 2
+    },
+    "NumberOfPublicVM": {
+      "type": "int",
+      "defaultValue": 2
+    }
+  },
+  "variables": {
+    "PrivateAvailabilitySetName": "PrivateAvailabilitySetName",
+    "PublicAvailabilitySetName": "PublicAvailabilitySetName",
+    "nsgName": "ravi-nsg"
+  },
+  "resources": [
+    {
+      "name": "[parameters('diagStorageAccountName')]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "tags": {
+        "displayName": "diagStorageAccount"
+      },
+      "apiVersion": "2017-06-01",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "[parameters('diagStorageAccountType')]"
+      },
+      "kind": "Storage",
+      "properties": {
+        "encryption": {
+          "keySource": "Microsoft.Storage",
+          "services": {
+            "blob": {
+              "enabled": true
+            },
+            "file": {
+              "enabled": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Compute/availabilitySets",
+      "name": "[variables('PrivateAvailabilitySetName')]",
+      "apiVersion": "2016-04-30-preview",
+      "location": "[parameters('location')]",
+      "tags": {
+        "displayName": "PrivateAvailabilitySet"
+      },
+      "properties": {
+        "platformUpdateDomainCount": 3,
+        "platformFaultDomainCount": 3
+      },
+      "sku": {
+        "name": "Aligned"
+      }
+    },
+    {
+      "type": "Microsoft.Compute/availabilitySets",
+      "name": "[variables('PublicAvailabilitySetName')]",
+      "apiVersion": "2016-04-30-preview",
+      "location": "[parameters('location')]",
+      "tags": {
+        "displayName": "PublicAvailabilitySet"
+      },
+      "properties": {
+        "platformUpdateDomainCount": 3,
+        "platformFaultDomainCount": 2
+      },
+      "sku": {
+        "name": "Aligned"
+      }
+    },
+    {
+      "name": "[variables('nsgName')]",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2015-05-01-preview",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Block_RDP_Internet",
+            "properties": {
+              "description": "Deny RDP traffic from the Internal Network",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "[parameters('virtualNetworkName')]",
+      "type": "Microsoft.Network/virtualNetworks",
+      "location": "[parameters('location')]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [
+        "[concat('Microsoft.Network/networkSecurityGroups/',variables('nsgName'))]"
+      ],
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "10.0.0.0/16"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[parameters('PrivateSubnetName')]",
+            "properties": {
+              "addressPrefix": "10.0.0.0/24"
+            },
+            "networkSecurityGroup": {
+              "id": "[resourceId('Microsoft.Network/networkSecurityGroups',variables('nsgName'))]"
+            }
+          },
+          {
+            "name": "[parameters('PublicSubnetName')]",
+            "properties": {
+              "addressPrefix": "10.0.1.0/24"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-06-15",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[concat(parameters('PrivateNicName'),copyIndex(1))]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "displayName": "Private_NIC"
+      },
+      "copy": {
+        "name": "NumberOfPrivateServer",
+        "count": "[parameters('NumberOfPrivateVM')]"
+      },
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[parameters(concat('private',copyIndex(1),'PrivateIPAddress'))]",
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets/',parameters('virtualNetworkName'),parameters('PrivateNicName'))]"
+              }
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Network/virtualNetworks/',parameters('virtualNetworkName'))]"
+      ]
+    },
+    {
+      "apiVersion": "2016-04-30-preview",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[concat(parameters('PrivateVMName'),copyIndex(1))]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "displayName": "Private VM"
+      },
+      "copy": {
+        "name": "NumberOfPrivateServer",
+        "count": "[parameters('NumberOfPrivateVM')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces/',concat(parameters('PrivateNicName'),copyIndex(1)))]",
+        "[resourceId('Microsoft.Storage/storageAccounts/',parameters('diagStorageAccountName'))]",
+        "[resourceId('Microsoft.Compute/availabilitySets',variables('PrivateAvailabilitySetName'))]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "Standard_D2"
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces/',concat(parameters('PrivateNicName'),copyIndex(1)))]"
+            }
+          ]
+        },
+        "storageProfile": {
+          "osDisk": {
+            "name": "[concat(parameters('PrivateVMName'),copyIndex(1),'-os-disk')]",
+            "createOption": "FromImage",
+            "caching": "ReadWrite"
+          },
+          "dataDisks": [
+            {
+              "createOption": "Empty",
+              "name": "[concat(parameters('PrivateVMName'),copyIndex(1),'-data-disk1')]",
+              "lun": 0,
+              "caching": "None",
+              "diskSizeGB": "200"
+            }
+          ],
+          "imageReference": {
+            "offer": "WindowsServer",
+            "publisher": "MicrosoftWindowsServer",
+            "sku": "2016-Datacenter",
+            "version": "latest"
+          }
+        },
+        "osProfile": {
+          "adminPassword": "[parameters('adminPassword')]",
+          "adminUsername": "[parameters('AdminUsername')]",
+          "computerName": "[concat(parameters('PrivateVMName'),copyIndex(1))]"
+        },
+        "availabilitySet": {
+          "id": "[resourceId('Microsoft.Compute/availabilitySets',variables('PrivateAvailabilitySetName'))]"
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true,
+            "storageUri": "[concat('http://',parameters('diagStorageAccountName'),'.blob.core.windows.net')]"
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-06-15",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[concat(parameters('PrivateNicName'),copyIndex(1))]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "displayName": "Public_NIC"
+      },
+      "copy": {
+        "name": "NumberOfPublicServer",
+        "count": "[parameters('NumberOfPublicVM')]"
+      },
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[parameters(concat('Public',copyIndex(1),'PublicIPAddress'))]",
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets/',parameters('virtualNetworkName'),parameters('PublicNicName'))]"
+              }
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Network/virtualNetworks/',parameters('virtualNetworkName'))]"
+      ]
+    },
+    {
+      "apiVersion": "2016-04-30-preview",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[concat(parameters('PublicVMName'),copyIndex(1))]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "displayName": "Public VM"
+      },
+      "copy": {
+        "name": "NumberOfPublicServer",
+        "count": "[parameters('NumberOfPublicVM')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces/',concat(parameters('PublicNicName'),copyIndex(1)))]",
+        "[resourceId('Microsoft.Storage/storageAccounts/',parameters('diagStorageAccountName'))]",
+        "[resourceId('Microsoft.Compute/availabilitySets',variables('PublicAvailabilitySetName'))]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "Standard_D2"
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces/',concat(parameters('PublicNicName'),copyIndex(1)))]"
+            }
+          ]
+        },
+        "storageProfile": {
+          "osDisk": {
+            "name": "[concat(parameters('PublicVMName'),copyIndex(1),'-os-disk')]",
+            "createOption": "FromImage",
+            "caching": "ReadWrite"
+          },
+          "dataDisks": [
+            {
+              "createOption": "Empty",
+              "name": "[concat(parameters('PublicVMName'),copyIndex(1),'-data-disk1')]",
+              "lun": 0,
+              "caching": "None",
+              "diskSizeGB": "200"
+            }
+          ],
+          "imageReference": {
+            "offer": "WindowsServer",
+            "publisher": "MicrosoftWindowsServer",
+            "sku": "2016-Datacenter",
+            "version": "latest"
+          }
+        },
+        "osProfile": {
+          "adminPassword": "[parameters('adminPassword')]",
+          "adminUsername": "[parameters('AdminUsername')]",
+          "computerName": "[concat(parameters('PublicVMName'),copyIndex(1))]"
+        },
+        "availabilitySet": {
+          "id": "[resourceId('Microsoft.Compute/availabilitySets',variables('PublicAvailabilitySetName'))]"
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true,
+            "storageUri": "[concat('http://',parameters('diagStorageAccountName'),'.blob.core.windows.net')]"
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+  }
+}

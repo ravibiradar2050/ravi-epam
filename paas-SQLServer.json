@@ -1,0 +1,169 @@
+﻿{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+  "parameters": {
+    "ProjectIdentifier": {
+      "type": "string"
+    },
+    "serverAdminLogin": {
+      "type": "string",
+      "metadata": { "description": "The account name to use for the database server administrator." }
+    },
+    "serverAdminPassword": {
+      "type": "securestring",
+      "metadata": { "description": "The password to use for the database server administrator." }
+    },
+    "database": {
+      "type": "array",
+      "metadata": {
+        "description": "SQL Server details"
+      }
+    },
+    "Location": {
+      "type": "string"
+    },
+    "workspaceId": {
+      "type": "string"
+    },
+    "transparentDataEncryption": {
+      "type": "string",
+      "allowedValues": [
+        "Enabled",
+        "Disabled"
+      ],
+      "defaultValue": "Enabled",
+      "metadata": {
+        "description": "Enable or disable Transparent Data Encryption (TDE) for the database."
+      }
+    }
+  },
+  "variables": {
+    "serverNameLowered": "[toLower(concat(parameters('ProjectIdentifier'),uniqueString(resourceGroup().id)))]",
+    "ProjectIdentifier": "[toLower(parameters('ProjectIdentifier'))]",
+    "DPOR": "550733",
+    "Outputdatabasename": "[parameters('Database')[0].DatabaseName]"
+  },
+    "resources": [
+      {
+        "name": "[variables('serverNameLowered')]",
+        "type": "Microsoft.Sql/servers",
+        "location": "[parameters('Location')]",
+        "apiVersion": "2014-04-01-preview",
+        "tags": {
+          "displayName": "SQL Server",
+          "DPOR": "[variables('DPOR')]"
+        },
+        "properties": {
+          "administratorLogin": "[parameters('serverAdminLogin')]",
+          "administratorLoginPassword": "[parameters('serverAdminPassword')]",
+          "version": "12.0"
+        },
+        "resources": [
+          {
+            "apiVersion": "2014-04-01-preview",
+            "dependsOn": [
+              "[concat('Microsoft.Sql/servers/', variables('serverNameLowered'))]"
+            ],
+            "location": "[parameters('Location')]",
+            "name": "AllowAllMicrosoftAzureIps",
+            "properties": {
+              "endIpAddress": "0.0.0.0",
+              "startIpAddress": "0.0.0.0"
+            },
+            "type": "firewallrules"
+          }
+        ]
+      },
+      {
+        "apiVersion": "2015-01-01",
+        "copy": {
+          "name": "databaseserverLoop",
+          "count": "[length(parameters('Database'))]"
+        },
+        "dependsOn": [
+          "[concat('Microsoft.Sql/servers/', variables('serverNameLowered'))]"
+        ],
+        "location": "[parameters('Location')]",
+        "name": "[concat(variables('serverNameLowered'),'/',parameters('Database')[copyindex()].DatabaseName,parameters('ProjectIdentifier'))]",
+        "properties": {
+          "collation": "[parameters('Database')[copyindex()].Collation]",
+          "edition": "[parameters('Database')[copyindex()].Edition]",
+          "maxSizeBytes": "[parameters('Database')[copyindex()].MaxSizeBytes]",
+          "requestedServiceObjectiveName": "[parameters('Database')[copyindex()].RequestedServiceObjectiveName]"
+        },
+        "resources": [
+          {
+            "name": "current",
+            "type": "transparentDataEncryption",
+            "comments": "Transparent Data Encryption",
+            "dependsOn": [
+              "[concat('Microsoft.Sql/servers/',variables('serverNameLowered'),'/databases/',parameters('Database')[copyindex()].DatabaseName,parameters('ProjectIdentifier'))]"
+            ],
+            "location": "[parameters('Location')]",
+            "apiVersion": "2014-04-01",
+            "properties": {
+              "status": "[parameters('transparentDataEncryption')]"
+            }
+          },
+          {
+            "type": "providers/diagnosticSettings",
+            "name": "Microsoft.Insights/service",
+            "apiVersion": "2015-07-01",
+            "dependsOn": [
+              "[concat('Microsoft.Sql/servers/',variables('serverNameLowered'),'/databases/',parameters('Database')[copyindex()].DatabaseName,parameters('ProjectIdentifier'))]"
+            ],
+            "properties": {
+              "workspaceId": "[parameters('workspaceId')]",
+              "logs": [
+                {
+                  "category": "QueryStoreRuntimeStatistics",
+                  "enabled": true
+                },
+                {
+                  "category": "QueryStoreWaitStatistics",
+                  "enabled": true
+                },
+                {
+                  "category": "DatabaseWaitStatistics",
+                  "enabled": true
+                },
+                {
+                  "category": "Blocks",
+                  "enabled": true
+                },
+                {
+                  "category": "SQLInsights",
+                  "enabled": true
+                },
+                {
+                  "category": "Errors",
+                  "enabled": true
+                },
+                {
+                  "category": "Timeouts",
+                  "enabled": true
+                }
+              ],
+              "metrics": [
+                {
+                  "timeGrain": "PT1M",
+                  "enabled": true
+                }
+              ]
+            }
+          }    
+        ],
+        "tags": {
+          "displayName": "SQL Database",
+          "DPOR": "[variables('DPOR')]"
+        },
+        "type": "Microsoft.Sql/servers/databases"
+      }
+    ],
+  "outputs": {
+    "DatabaseConnectionString": {
+      "type": "string",
+      "value": "[concat('Server=tcp:',reference(variables('serverNameLowered')).fullyQualifiedDomainName,',1433;Initial Catalog=',variables('Outputdatabasename'),';Persist Security Info=False;User ID=',reference(variables('serverNameLowered')).administratorLogin,';Password=GetFromKeyVault;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;')]"
+    }
+  }
+}

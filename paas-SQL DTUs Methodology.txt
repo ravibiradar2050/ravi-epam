@@ -1,0 +1,29 @@
+Measure the following utilization metrics:
+ 
+Processor - % Processor Time
+Logical Disk - Disk Reads/sec
+Logical Disk - Disk Writes/sec
+Database - Log Bytes Flushed/sec
+
+
+To measure above use the below PS script
+
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Unrestricted -Force
+
+$ErrorActionPreference = "Stop"
+$VerbosePreference = "Continue"
+
+cls
+
+Write-Output "Collecting counters..."
+Write-Output "Press Ctrl+C to exit."
+
+$counters = @("\Processor(_Total)\% Processor Time", 
+"\LogicalDisk(_Total)\Disk Reads/sec", 
+"\LogicalDisk(_Total)\Disk Writes/sec", 
+"\SQLServer:Databases(_Total)\Log Bytes Flushed/sec") 
+
+Get-Counter -Counter $counters -SampleInterval 1 -MaxSamples 3600 | 
+    Export-Counter -FileFormat csv -Path "C:\sql-perfmon-log.csv" -Force
+
+Once we done with the above measurement, Azure SQL Database DTU Calculator (availbale online) can be used to get exact value.
