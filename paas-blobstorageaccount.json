@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "StorageAccountName": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "StorageAccessTier": {
+      "type": "string",
+      "defaultValue": "Hot"
+    }
+  },
+  "variables": {
+    "storageAccountType": "Standard_GRS"
+  },
+  "resources": [
+    {
+      "apiVersion": "2017-06-01",
+      "kind": "BlobStorage",
+      "location": "[resourceGroup().location]",
+      "name": "[parameters('storageAccountName')]",
+      "properties": {
+        "supportsHttpsTrafficOnly": true,
+        "accessTier": "[parameters('StorageAccessTier')]",
+        "encryption": {
+          "services": {
+            "file": {
+              "enabled": true
+            },
+            "blob": {
+              "enabled": true
+            }
+          },
+          "keySource": "Microsoft.Storage"
+        }
+      },
+      "sku": {
+        "name": "[variables('storageAccountType')]"
+      },
+      "type": "Microsoft.Storage/storageAccounts"
+    }
+  ]
+}

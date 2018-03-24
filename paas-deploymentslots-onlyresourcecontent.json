@@ -1,0 +1,53 @@
+﻿{
+  "name": "[concat(variables('apiSiteName'), '/staging')]",
+  "type": "Microsoft.Web/sites/slots",
+  "location": "[resourceGroup().location]",
+  "apiVersion": "2015-08-01",
+  "dependsOn": [
+    "[resourceId('Microsoft.Web/Sites', variables('apiSiteName'))]"
+  ],
+  "tags": {
+    "[concat('hidden-related:', resourceGroup().id, '/providers/Microsoft.Web/serverfarms/', parameters('apiHostingPlanName'))]": "Resource",
+    "displayName": "Slot Web / API"
+  },
+  "properties": {
+    "name": "[concat(variables('apiSiteName'), '(staging)')]",
+    "serverFarmId": "[resourceId('Microsoft.Web/serverfarms/', parameters('apiHostingPlanName'))]",
+    "clientAffinityEnabled": false
+  },
+  "resources": [
+    {
+      "apiVersion": "2015-08-01",
+      "name": "connectionstrings",
+      "type": "config",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Web/Sites/', variables('apiSiteName'), '/slots/staging')]"
+      ],
+      "properties": {
+        "masterdata": {
+          "value": "[concat('Data Source=tcp:', reference(resourceId('Microsoft.Sql/servers/', variables('sqlserverName'))).fullyQualifiedDomainName, ',1433;Initial Catalog=', parameters('databaseName'), ';User Id=', parameters('administratorLogin'), '@', variables('sqlserverName'), ';Password=', parameters('administratorLoginPassword'), ';')]",
+          "type": "SQLServer"
+        },
+        "redis": {
+          "value": "[concat(reference(resourceId('Microsoft.Cache/Redis', variables('RedisCache').Name)).hostName, variables('RedisCache').WebAppRedisSettingText, listKeys(resourceId('Microsoft.Cache/Redis', variables('RedisCache').Name), '2015-08-01').primaryKey)]",
+          "type": "Custom"
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-08-01",
+      "type": "config",
+      "name": "web",
+      "dependsOn": [
+        "[concat('Microsoft.Web/Sites/', variables('apiSiteName'), '/slots/staging')]"
+      ],
+      "properties": {
+        "use32BitWorkerProcess": false,
+        "alwaysOn": true,
+        "phpVersion": "",
+        "defaultDocuments": []
+      }
+    }
+  ]
+}
