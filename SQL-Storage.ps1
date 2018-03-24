@@ -10,6 +10,9 @@ New-AzureRmResourceGroup `
 $StorageAccountName = "mystorageaccount"
 $SkuName = "Standard_LRS"
 
+#Blob-Service
+New-AzureRmStorageAccount -ResourceGroupName $ResourceGroupName -Name "storagejustforblob" -Location $Location -Kind BlobStorage 
+
 # Create a new storage account
 $StorageAccount = New-AzureRMStorageAccount `
   -Location $location `
