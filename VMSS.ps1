@@ -1,4 +1,4 @@
-﻿aram
+param
 (   
     [string] [Parameter(Mandatory=$true)] $SubscriptionID, 
     [string] [Parameter(Mandatory=$true)] $ResourceGroupName,
